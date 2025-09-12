@@ -2,12 +2,21 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + TS</title>
+    <title>Focus Proctor</title>
   </head>
   <body>
-    <div id="app"></div>
+    <h1>Focus Proctor Demo</h1>
+    <div id="video-wrapper">
+      <video id="video" autoplay playsinline></video>
+      <canvas id="overlay"></canvas>
+    </div>
+    <div id="controls">
+      <button id="startBtn">Start</button>
+      <button id="stopBtn" disabled>Stop</button>
+    </div>
+    <h2>Event Log</h2>
+    <ul id="logs"></ul>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
