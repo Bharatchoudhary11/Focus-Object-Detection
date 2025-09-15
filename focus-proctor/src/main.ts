@@ -17,7 +17,6 @@ const recordingChunks: Blob[] = [];
 
 let lastFaceTime = 0;
 let lastFocusedTime = 0;
-let lastObjectCheck = 0;
 let focusLostLogged = false;
 let noFaceLogged = false;
 let multiFaceLogged = false;
@@ -44,7 +43,7 @@ async function loadModels() {
   objectModel = await coco.load();
 }
 
-const modelsReady = loadModels().finally(() => {
+loadModels().finally(() => {
   startBtn.disabled = false;
 });
 
@@ -82,7 +81,6 @@ async function start() {
   recorder.start();
   lastFaceTime = Date.now();
   lastFocusedTime = Date.now();
-  lastObjectCheck = Date.now();
   detecting = true;
   detect();
   stopBtn.disabled = false;
@@ -151,7 +149,7 @@ async function detect() {
     // Draw frames around all detected faces
     ctx.lineWidth = 2;
     ctx.strokeStyle = 'lime';
-    faces.forEach((f) => {
+    faces.forEach((f: any) => {
       const [fx1, fy1] = f.topLeft as number[];
       const [fx2, fy2] = f.bottomRight as number[];
       ctx.strokeRect(fx1, fy1, fx2 - fx1, fy2 - fy1);
@@ -179,16 +177,14 @@ async function detect() {
     }
     }
 
-    if (Date.now() - lastObjectCheck > 1000) {
-      lastObjectCheck = Date.now();
-      const objects = await objectModel.detect(video);
+    const objects = await objectModel.detect(video);
 
     // Draw frames around all detected objects with labels
     ctx.lineWidth = 2;
     ctx.strokeStyle = 'red';
     ctx.font = '14px sans-serif';
     ctx.textBaseline = 'top';
-    objects.forEach((obj) => {
+    objects.forEach((obj: any) => {
       const [x, y, w, h] = obj.bbox as [number, number, number, number];
       ctx.strokeRect(x, y, w, h);
       const label = `${obj.class} ${(obj.score * 100).toFixed(0)}%`;
@@ -205,7 +201,6 @@ async function detect() {
         logEvent(`Suspicious item detected: ${obj.class}`);
       }
     });
-    }
   } catch (err) {
     console.error('Detection error:', err);
     // Swallow and continue next frame
