@@ -18,6 +18,6 @@ const app = initializeApp(firebaseConfig);
 // Improve connectivity in restricted environments (proxies, ad blockers)
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
-  useFetchStreams: false,
+  
 });
 export const storage = getStorage(app);
