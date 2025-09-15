@@ -32,6 +32,7 @@ let lastFocusedTime = 0;
 let focusLostLogged = false;
 let noFaceLogged = false;
 let multiFaceLogged = false;
+let lastDirection: 'left' | 'right' | null = null;
 let detecting = false;
 let animationId = 0;
 
@@ -226,17 +227,26 @@ async function detect() {
       const cy = (y1 + y2) / 2;
       const threshX = canvas.width * 0.2;
       const threshY = canvas.height * 0.2;
-      if (
-        Math.abs(cx - canvas.width / 2) > threshX ||
-        Math.abs(cy - canvas.height / 2) > threshY
-      ) {
-        if (!focusLostLogged && Date.now() - lastFocusedTime > 5000) {
-          logEvent('User looking away for >5s');
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      let dir: 'left' | 'right' | null = null;
+      if (cx < centerX - threshX) dir = 'left';
+      else if (cx > centerX + threshX) dir = 'right';
+
+      const offCenter = dir !== null || Math.abs(cy - centerY) > threshY;
+      if (offCenter) {
+        if (
+          (dir !== lastDirection || !focusLostLogged) &&
+          Date.now() - lastFocusedTime > 5000
+        ) {
+          logEvent(dir ? `User looking away (${dir})` : 'User looking away');
           focusLostLogged = true;
+          lastDirection = dir;
         }
       } else {
         lastFocusedTime = Date.now();
         focusLostLogged = false;
+        lastDirection = null;
       }
     }
 
