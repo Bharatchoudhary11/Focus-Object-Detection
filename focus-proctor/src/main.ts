@@ -129,6 +129,14 @@ async function detect() {
   try {
     const faces = await faceModel.estimateFaces(video, false);
 
+    // The video element can occasionally report zero dimensions if the stream
+    // is interrupted between awaits. Skip processing in that case to avoid
+    // WebGL texture creation errors.
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      animationId = requestAnimationFrame(detect);
+      return;
+    }
+
     if (faces.length === 0) {
       if (!noFaceLogged && Date.now() - lastFaceTime > 10000) {
         logEvent('No face detected for >10s');
@@ -138,43 +146,49 @@ async function detect() {
       lastFaceTime = Date.now();
       noFaceLogged = false;
 
-    if (faces.length > 1 && !multiFaceLogged) {
-      logEvent('Multiple faces detected');
-      multiFaceLogged = true;
-    }
-    if (faces.length === 1) {
-      multiFaceLogged = false;
-    }
-
-    // Draw frames around all detected faces
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = 'lime';
-    faces.forEach((f: any) => {
-      const [fx1, fy1] = f.topLeft as number[];
-      const [fx2, fy2] = f.bottomRight as number[];
-      ctx.strokeRect(fx1, fy1, fx2 - fx1, fy2 - fy1);
-    });
-
-    // Focus tracking based on the primary face (first)
-    const primary = faces[0];
-    const [x1, y1] = primary.topLeft as number[];
-    const [x2, y2] = primary.bottomRight as number[];
-    const cx = (x1 + x2) / 2;
-    const cy = (y1 + y2) / 2;
-    const threshX = canvas.width * 0.2;
-    const threshY = canvas.height * 0.2;
-    if (
-      Math.abs(cx - canvas.width / 2) > threshX ||
-      Math.abs(cy - canvas.height / 2) > threshY
-    ) {
-      if (!focusLostLogged && Date.now() - lastFocusedTime > 5000) {
-        logEvent('User looking away for >5s');
-        focusLostLogged = true;
+      if (faces.length > 1 && !multiFaceLogged) {
+        logEvent('Multiple faces detected');
+        multiFaceLogged = true;
       }
-    } else {
-      lastFocusedTime = Date.now();
-      focusLostLogged = false;
+      if (faces.length === 1) {
+        multiFaceLogged = false;
+      }
+
+      // Draw frames around all detected faces
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'lime';
+      faces.forEach((f: any) => {
+        const [fx1, fy1] = f.topLeft as number[];
+        const [fx2, fy2] = f.bottomRight as number[];
+        ctx.strokeRect(fx1, fy1, fx2 - fx1, fy2 - fy1);
+      });
+
+      // Focus tracking based on the primary face (first)
+      const primary = faces[0];
+      const [x1, y1] = primary.topLeft as number[];
+      const [x2, y2] = primary.bottomRight as number[];
+      const cx = (x1 + x2) / 2;
+      const cy = (y1 + y2) / 2;
+      const threshX = canvas.width * 0.2;
+      const threshY = canvas.height * 0.2;
+      if (
+        Math.abs(cx - canvas.width / 2) > threshX ||
+        Math.abs(cy - canvas.height / 2) > threshY
+      ) {
+        if (!focusLostLogged && Date.now() - lastFocusedTime > 5000) {
+          logEvent('User looking away for >5s');
+          focusLostLogged = true;
+        }
+      } else {
+        lastFocusedTime = Date.now();
+        focusLostLogged = false;
+      }
     }
+
+    // Re-check dimensions before running object detection.
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      animationId = requestAnimationFrame(detect);
+      return;
     }
 
     const objects = await objectModel.detect(video);
