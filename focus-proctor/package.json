@@ -16,6 +16,7 @@
   "dependencies": {
     "@tensorflow-models/blazeface": "^0.1.0",
     "@tensorflow-models/coco-ssd": "^2.2.3",
-    "@tensorflow/tfjs": "^4.22.0"
+    "@tensorflow/tfjs": "^4.22.0",
+    "firebase": "^12.2.1"
   }
 }

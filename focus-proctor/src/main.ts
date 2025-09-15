@@ -1,4 +1,13 @@
 import './style.css';
+import { db, storage } from './firebase';
+import {
+  addDoc,
+  collection,
+  doc,
+  serverTimestamp,
+  updateDoc,
+} from 'firebase/firestore';
+import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 
 const video = document.getElementById('video') as HTMLVideoElement;
 const canvas = document.getElementById('overlay') as HTMLCanvasElement;
@@ -15,6 +24,9 @@ let stream: MediaStream;
 let recorder: MediaRecorder;
 const recordingChunks: Blob[] = [];
 
+// Firebase session state
+let sessionDocId: string | null = null;
+
 let lastFaceTime = 0;
 let lastFocusedTime = 0;
 let focusLostLogged = false;
@@ -27,6 +39,18 @@ function logEvent(msg: string) {
   const li = document.createElement('li');
   li.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
   logs.appendChild(li);
+
+  // Fire-and-forget store to Firestore if a session exists
+  if (sessionDocId) {
+    const ev = {
+      message: msg,
+      ts: new Date(),
+    } as const;
+    addDoc(collection(db, 'sessions', sessionDocId, 'events'), {
+      ...ev,
+      serverTs: serverTimestamp(),
+    }).catch((e) => console.warn('Failed to write event', e));
+  }
 }
 
 async function loadModels() {
@@ -79,6 +103,20 @@ async function start() {
   recorder = new MediaRecorder(stream);
   recorder.ondataavailable = (e) => recordingChunks.push(e.data);
   recorder.start();
+
+  // Create a new session in Firestore
+  try {
+    const session = await addDoc(collection(db, 'sessions'), {
+      createdAt: serverTimestamp(),
+      userAgent: navigator.userAgent,
+      viewport: { w: window.innerWidth, h: window.innerHeight },
+      video: { width: video.videoWidth, height: video.videoHeight },
+      status: 'recording',
+    });
+    sessionDocId = session.id;
+  } catch (e) {
+    console.warn('Failed to create session doc', e);
+  }
   lastFaceTime = Date.now();
   lastFocusedTime = Date.now();
   detecting = true;
@@ -99,6 +137,23 @@ function stop() {
   a.download = 'recording.webm';
   a.click();
   startBtn.disabled = false;
+
+  // Upload to Firebase Storage and update session
+  if (sessionDocId) {
+    const path = `recordings/${sessionDocId}.webm`;
+    const storageRef = ref(storage, path);
+    uploadBytes(storageRef, blob)
+      .then(() => getDownloadURL(storageRef))
+      .then(async (downloadURL) => {
+        await updateDoc(doc(db, 'sessions', sessionDocId!), {
+          endedAt: serverTimestamp(),
+          status: 'stopped',
+          recordingPath: path,
+          recordingUrl: downloadURL,
+        });
+      })
+      .catch((e) => console.warn('Failed to upload/update session', e));
+  }
 }
 
 async function detect() {
