@@ -1,0 +1,5 @@
+{
+  "installCommand": "npm install --prefix focus-proctor",
+  "buildCommand": "npm run build --prefix focus-proctor",
+  "outputDirectory": "focus-proctor/dist"
+}
