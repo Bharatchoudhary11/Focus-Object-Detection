@@ -10,6 +10,8 @@ const logs = document.getElementById('logs') as HTMLUListElement;
 const startBtn = document.getElementById('startBtn') as HTMLButtonElement;
 const stopBtn = document.getElementById('stopBtn') as HTMLButtonElement;
 
+startBtn.disabled = true;
+
 let faceModel: blazeface.BlazeFaceModel;
 let objectModel: cocoSsd.ObjectDetection;
 let stream: MediaStream;
@@ -38,6 +40,10 @@ async function initModels() {
   ]);
 }
 
+const modelPromise = initModels().finally(() => {
+  startBtn.disabled = false;
+});
+
 async function start() {
   startBtn.disabled = true;
   logs.innerHTML = '';
@@ -45,7 +51,7 @@ async function start() {
   noFaceLogged = false;
   multiFaceLogged = false;
   recordingChunks.length = 0;
-  await initModels();
+  await modelPromise;
   stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
   video.srcObject = stream;
   await video.play();
