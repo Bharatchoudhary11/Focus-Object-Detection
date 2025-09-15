@@ -22,6 +22,8 @@ let lastObjectCheck = 0;
 let focusLostLogged = false;
 let noFaceLogged = false;
 let multiFaceLogged = false;
+let detecting = false;
+let animationId = 0;
 
 function logEvent(msg: string) {
   const li = document.createElement('li');
@@ -47,12 +49,15 @@ async function start() {
   recorder.start();
   lastFaceTime = Date.now();
   lastFocusedTime = Date.now();
+  detecting = true;
   detect();
   stopBtn.disabled = false;
 }
 
 function stop() {
   stopBtn.disabled = true;
+  detecting = false;
+  cancelAnimationFrame(animationId);
   recorder.stop();
   stream.getTracks().forEach((t) => t.stop());
   const blob = new Blob(recordingChunks, { type: 'video/webm' });
@@ -65,6 +70,7 @@ function stop() {
 }
 
 async function detect() {
+  if (!detecting) return;
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -123,7 +129,9 @@ async function detect() {
     });
   }
 
-  requestAnimationFrame(detect);
+  if (detecting) {
+    animationId = requestAnimationFrame(detect);
+  }
 }
 
 startBtn.addEventListener('click', () => {
