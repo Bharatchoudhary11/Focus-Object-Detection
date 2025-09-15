@@ -13,8 +13,19 @@
       <canvas id="overlay"></canvas>
     </div>
     <div id="controls">
-      <button id="startBtn" disabled>Start</button>
-      <button id="stopBtn" disabled>Stop</button>
+      <div class="button-row">
+        <button id="startBtn" disabled>Start</button>
+        <button id="stopBtn" disabled>Stop</button>
+      </div>
+      <div
+        id="statusIndicator"
+        role="status"
+        aria-live="polite"
+        data-state="loading"
+      >
+        <span class="status-dot" aria-hidden="true"></span>
+        <span id="statusText">Loading models…</span>
+      </div>
     </div>
     <h2>Event Log</h2>
     <ul id="logs"></ul>

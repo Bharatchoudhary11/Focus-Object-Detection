@@ -15,8 +15,19 @@ const ctx = canvas.getContext('2d')!;
 const logs = document.getElementById('logs') as HTMLUListElement;
 const startBtn = document.getElementById('startBtn') as HTMLButtonElement;
 const stopBtn = document.getElementById('stopBtn') as HTMLButtonElement;
+const statusIndicator = document.getElementById('statusIndicator') as HTMLDivElement;
+const statusText = document.getElementById('statusText') as HTMLSpanElement;
 
 startBtn.disabled = true;
+startBtn.setAttribute('aria-pressed', 'false');
+stopBtn.setAttribute('aria-pressed', 'false');
+
+type StatusState = 'loading' | 'ready' | 'active' | 'idle' | 'error';
+
+function updateStatus(text: string, state: StatusState) {
+  statusText.textContent = text;
+  statusIndicator.dataset.state = state;
+}
 
 let faceModel: any; // Loaded dynamically
 let objectModel: any; // Loaded dynamically
@@ -69,13 +80,22 @@ async function loadModels() {
   objectModel = await coco.load();
 }
 
-loadModels().finally(() => {
-  startBtn.disabled = false;
-});
+loadModels()
+  .then(() => {
+    updateStatus('Ready to start', 'ready');
+    startBtn.disabled = false;
+  })
+  .catch((err) => {
+    console.error('Failed to load models', err);
+    updateStatus('Model load failed — you can still try to start', 'error');
+    startBtn.disabled = false;
+  });
 
 async function start() {
   if (isRunning) return;
   startBtn.disabled = true;
+  startBtn.setAttribute('aria-pressed', 'true');
+  updateStatus('Requesting camera access…', 'loading');
   logs.innerHTML = '';
   focusLostLogged = false;
   noFaceLogged = false;
@@ -87,11 +107,15 @@ async function start() {
   } catch (e) {
     console.error('getUserMedia error', e);
     logEvent('Failed to access camera/microphone');
+    updateStatus('Camera or microphone permission denied', 'error');
     startBtn.disabled = false;
+    startBtn.setAttribute('aria-pressed', 'false');
+    startBtn.focus();
     return;
   }
   video.srcObject = stream;
   await video.play();
+  updateStatus('Preparing session…', 'loading');
   // Ensure video has non-zero dimensions before starting detection
   if (video.videoWidth === 0 || video.videoHeight === 0) {
     await new Promise<void>((resolve) => {
@@ -127,6 +151,7 @@ async function start() {
   }
 
   // Create a new session in Firestore
+  let sessionCreated = true;
   try {
     const session = await addDoc(collection(db, 'sessions'), {
       createdAt: serverTimestamp(),
@@ -138,6 +163,7 @@ async function start() {
     sessionDocId = session.id;
   } catch (e) {
     console.warn('Failed to create session doc', e);
+    sessionCreated = false;
   }
   lastFaceTime = Date.now();
   lastFocusedTime = Date.now();
@@ -145,10 +171,17 @@ async function start() {
   isRunning = true;
   detect();
   stopBtn.disabled = false;
+  stopBtn.focus();
+  const statusMessage = sessionCreated
+    ? 'Monitoring in progress'
+    : 'Monitoring in progress (session not saved)';
+  updateStatus(statusMessage, 'active');
+  logEvent('Session started');
 }
 
 function stop() {
   if (!isRunning) return;
+  updateStatus('Stopping session…', 'loading');
   stopBtn.disabled = true;
   detecting = false;
   isRunning = false;
@@ -161,23 +194,37 @@ function stop() {
   a.href = url;
   a.download = 'recording.webm';
   a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+  recordingChunks.length = 0;
   startBtn.disabled = false;
+  startBtn.setAttribute('aria-pressed', 'false');
+  startBtn.focus();
+  logEvent('Session stopped');
 
   // Upload to Firebase Storage and update session
-  if (sessionDocId) {
-    const path = `recordings/${sessionDocId}.webm`;
+  const currentSessionId = sessionDocId;
+  sessionDocId = null;
+  if (currentSessionId) {
+    updateStatus('Session stopped — uploading recording…', 'loading');
+    const path = `recordings/${currentSessionId}.webm`;
     const storageRef = ref(storage, path);
     uploadBytes(storageRef, blob)
       .then(() => getDownloadURL(storageRef))
       .then(async (downloadURL) => {
-        await updateDoc(doc(db, 'sessions', sessionDocId!), {
+        await updateDoc(doc(db, 'sessions', currentSessionId), {
           endedAt: serverTimestamp(),
           status: 'stopped',
           recordingPath: path,
           recordingUrl: downloadURL,
         });
+        updateStatus('Ready to start another session', 'ready');
       })
-      .catch((e) => console.warn('Failed to upload/update session', e));
+      .catch((e) => {
+        console.warn('Failed to upload/update session', e);
+        updateStatus('Upload failed — ready to retry', 'error');
+      });
+  } else {
+    updateStatus('Ready to start', 'ready');
   }
 }
 
