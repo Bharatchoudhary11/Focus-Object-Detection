@@ -40,6 +40,11 @@ async function initModels() {
 
 async function start() {
   startBtn.disabled = true;
+  logs.innerHTML = '';
+  focusLostLogged = false;
+  noFaceLogged = false;
+  multiFaceLogged = false;
+  recordingChunks.length = 0;
   await initModels();
   stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
   video.srcObject = stream;
@@ -49,6 +54,7 @@ async function start() {
   recorder.start();
   lastFaceTime = Date.now();
   lastFocusedTime = Date.now();
+  lastObjectCheck = Date.now();
   detecting = true;
   detect();
   stopBtn.disabled = false;
